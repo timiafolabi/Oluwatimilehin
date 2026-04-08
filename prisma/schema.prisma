@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Provider {
+  gmail
+  outlook
+}
+
+enum AccountStatus {
+  connected
+  error
+  disconnected
+}
+
+enum TriageClass {
+  urgent
+  important
+  normal
+  low_priority
+  spam_promotional
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+}
+
+enum EmailStatus {
+  ingested
+  triaged
+  needs_approval
+  draft_ready
+  sent
+  archived
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  phoneNumber   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  accounts      ConnectedAccount[]
+  emails        NormalizedEmail[]
+  rules         UserRule[]
+  smsEvents     SmsEvent[]
+  learningItems LearningSignal[]
+  logs          ActivityLog[]
+  draftRevisions DraftRevision[]
+  sentMessages   SentMessage[]
+}
+
+model ConnectedAccount {
+  id               String       @id @default(cuid())
+  userId           String
+  provider         Provider
+  accountEmail     String
+  accessToken      String
+  refreshToken     String?
+  tokenExpiresAt   DateTime?
+  status           AccountStatus @default(connected)
+  notificationsOn  Boolean      @default(true)
+  draftingEnabled  Boolean      @default(true)
+  autoActionsEnabled Boolean    @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails           NormalizedEmail[]
+
+  @@unique([userId, provider, accountEmail])
+}
+
+model NormalizedEmail {
+  id                String      @id
+  userId            String
+  accountId         String
+  provider          Provider
+  threadId          String
+  senderName        String?
+  senderEmail       String
+  recipients        Json
+  subject           String
+  bodyText          String
+  bodyHtml          String?
+  receivedAt        DateTime
+  labels            Json
+  attachments       Json
+  rawImportance     Float       @default(0)
+  triageClass       TriageClass @default(normal)
+  aiSummary         String?
+  aiActionItems     Json
+  aiDeadline        String?
+  aiDraftReply      String?
+  riskLevel         RiskLevel   @default(medium)
+  riskCategories    Json       @default("[]")
+  requiresApproval  Boolean     @default(true)
+  confidence        Float       @default(0)
+  status            EmailStatus @default(ingested)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account           ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, accountId])
+  @@index([triageClass, riskLevel, requiresApproval])
+}
+
+model UserRule {
+  id                 String   @id @default(cuid())
+  userId             String
+  autoHandleLowRisk  Boolean  @default(false)
+  importantSenders   Json
+  mutedSenders       Json       @default("[]")
+  instantSmsCategories Json     @default("[]")
+  ignoredPatterns    Json
+  approvalCategories Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SmsEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  emailId     String?
+  direction   String
+  body        String
+  interpretedAction String?
+  status      String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LearningSignal {
+  id          String   @id @default(cuid())
+  userId      String
+  emailId     String?
+  signalType  String
+  payload     Json
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  emailId     String?
+  action      String
+  status      String
+  metadata    Json
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+model DraftRevision {
+  id            String   @id @default(cuid())
+  userId        String
+  emailId       String
+  previousDraft String?
+  newDraft      String
+  editedBy      String
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SentMessage {
+  id            String   @id @default(cuid())
+  userId        String
+  emailId       String
+  provider      Provider
+  accountEmail  String
+  subject       String
+  body          String
+  status        String
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
