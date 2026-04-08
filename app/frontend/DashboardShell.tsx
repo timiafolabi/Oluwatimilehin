@@ -1,15 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AccountCard } from "./components/AccountCard";
+import { InboxTable } from "./components/InboxTable";
+import { DraftApprovalPanel } from "./components/DraftApprovalPanel";
+import { PersonalizationSettingsPanel } from "./components/PersonalizationSettingsPanel";
+import { ActivityLogPanel } from "./components/ActivityLogPanel";
+import { panelStyle } from "./components/ui";
 
 type DashboardPayload = {
   ready: boolean;
   message: string;
+  accounts: Array<{
+    id: string;
+    provider: "gmail" | "outlook";
+    email: string;
+    status: "connected" | "error" | "needs_reauth";
+    notificationsOn: boolean;
+    draftingEnabled: boolean;
+    autoActionsEnabled: boolean;
+  }>;
 };
 
 const fallbackPayload: DashboardPayload = {
   ready: false,
-  message: "Live data is not configured yet. This safe shell renders without database access."
+  message: "Live data is not configured yet. This safe shell renders without database access.",
+  accounts: []
 };
 
 export function DashboardShell() {
@@ -49,20 +65,41 @@ export function DashboardShell() {
   }, []);
 
   return (
-    <main style={{ padding: 24, display: "grid", gap: 16 }}>
+    <main style={{ padding: 24, display: "grid", gap: 24 }}>
       <h1>Oluwatimilehin Assistant Dashboard</h1>
 
-      <section style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "white" }}>
+      <section style={panelStyle}>
         <strong>{loading ? "Loading dashboard…" : payload.ready ? "Dashboard ready" : "Safe placeholder mode"}</strong>
         <p style={{ marginTop: 8 }}>{payload.message}</p>
       </section>
 
-      <section style={{ border: "1px dashed #cbd5e1", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
-        <h2 style={{ marginTop: 0 }}>Dashboard Placeholder</h2>
-        <p>
-          Accounts, inbox, approvals, and activity will appear here after runtime configuration is complete. This shell is
-          intentionally database-free during build.
-        </p>
+      <section>
+        <h2>Connected Accounts</h2>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))" }}>
+          {payload.accounts.length === 0 ? <div style={panelStyle}>No accounts connected yet.</div> : null}
+          {payload.accounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              provider={account.provider}
+              email={account.email}
+              status={account.status}
+              notificationsOn={account.notificationsOn}
+              draftingEnabled={account.draftingEnabled}
+              autoActionsEnabled={account.autoActionsEnabled}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Unified Inbox</h2>
+        <InboxTable rows={[]} />
+      </section>
+
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+        <DraftApprovalPanel drafts={[]} />
+        <PersonalizationSettingsPanel importantSenders={[]} mutedSenders={[]} instantSmsCategories={[]} recentSignals={[]} />
+        <ActivityLogPanel items={[]} />
       </section>
     </main>
   );
